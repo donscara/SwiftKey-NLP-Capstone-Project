@@ -1,0 +1,158 @@
+---
+title: "SwiftKey Text Data and Natural Language Processing NLP Project"
+author: "Donato Scarano"
+date: "12 luglio 2018"
+output: html_document
+---
+
+##Project Introduction
+
+We will start with the basics, analyzing a large corpus of text documents to discover the structure in the data and how words are put together.
+We will cover cleaning and analyzing text data, then building and sampling from a predictive text model. 
+Finally, we will build a predictive text product.
+
+This is the training data that will be the basis of this project: https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip
+
+The corpora are collected from publicly available sources by a web crawler. The crawler checks for language, so as to mainly get texts consisting of the desired language.
+
+Each entry is tagged with it's date of publication. Where user comments are included they will be tagged with the date of the main entry.
+
+Each entry is tagged with the type of entry, based on the type of website it is collected from (e.g. newspaper or personal blog). 
+If possible, each entry is tagged with one or more subjects based on the title or keywords of the entry (e.g. if the entry comes from the sports section of a newspaper it will be tagged with "sports" subject).
+In many cases it's not feasible to tag the entries (for example, it's not really practical to tag each individual Twitter entry, though I've got some ideas which might be implemented in the future) or no subject is found by the automated process, in which case the entry is tagged with a '0'.
+
+To save space, the subject and type is given as a numerical code.
+
+Once the raw corpus has been collected, it is parsed further, to remove duplicate entries and split into individual lines. Approximately 50% of each entry is then deleted. Since you cannot fully recreate any entries, the entries are anonymised and this is a non-profit venture I believe that it would fall under Fair Use.
+
+#Import Data
+
+After downloading the dataset we read the blog, news and twitter files.
+
+```{r echo=TRUE}
+library(installr)
+blog <- readLines(con = "final/en_US/en_US.blogs.txt", skipNul = T)
+news <- readLines(con = "final/en_US/en_US.news.txt", skipNul = T)
+twitter <- readLines(con = "final/en_US/en_US.twitter.txt", skipNul = T)
+```
+
+We create a 5% sample of each file.
+
+```{r echo=TRUE}
+blogsample<- sample(blog,length(blog)*0.05)
+newssample<- sample(news,length(news)*0.05)
+twittersample<- sample(twitter,length(twitter)*0.05)
+```
+
+We join the sample files in a single text sample.
+
+```{r echo=TRUE}
+textsample<-c(blogsample,newssample,twittersample)
+length(textsample)
+head(textsample)
+```
+
+# Cleaning the Data
+
+Clean the data removing numbers, punctuation, common english stopwords, whitespace, transform to lower cases...
+
+```{r echo=TRUE}
+library(tm)
+cleantextsample<-Corpus(VectorSource(list(textsample)))
+cleantextsample<-tm_map(cleantextsample, removeNumbers)
+cleantextsample<-tm_map(cleantextsample, removePunctuation)
+cleantextsample<-tm_map(cleantextsample, stripWhitespace)
+cleantextsample<-tm_map(cleantextsample, PlainTextDocument)
+cleantextsample<-tm_map(cleantextsample, content_transformer(tolower))
+cleantextsample<-tm_map(cleantextsample, removeWords, stopwords("english"))
+```
+
+#Exploratory Data Analysis
+
+We perform an exploratory data analysis to understand the distribution of words and their relationship.
+
+We higlight the frequencies of words and word pairs and we build figures and tables to understand variation in the frequencies of words and word pairs in the data.
+
+NGRAMS
+
+We create n-grams(1 to 3) to perform NLP (Natural Language Processing) analysis. 
+
+```{r echo=TRUE}
+library(ngram)
+cleantextsample<-as.String(cleantextsample)
+unogram<- ngram_asweka(cleantextsample,1,1)
+bigram<- ngram_asweka(cleantextsample,2,2)
+trigram<- ngram_asweka(cleantextsample,3,3)
+```
+
+We create a data frame out of the ngrams to sort in decreasing order the values and highlight the top occurrencies. 
+We create a plot for the NGram-1 to visualize the frequency.
+
+```{r echo=TRUE}
+unogram<-data.frame(table(unogram))
+unogramsort<-unogram[order(unogram$Freq,decreasing=TRUE),]
+unogramsorttop<-unogramsort[1:50,]
+unogramsorttop$unogram<-factor(unogramsorttop$unogram, levels=unogramsorttop$unogram[order(-unogramsort$Freq)])
+
+library(ggplot2)
+ggplot(unogramsorttop,aes(x=unogram,y=Freq, fill=Freq))+
+  geom_bar(stat="identity")+
+  theme_classic()+
+  coord_flip()+
+  labs(x= "NGrams",y="Frequency", title="Ngram-1 Frequency")
+
+```
+
+Same as above for NGram-2
+
+```{r echo=TRUE}
+bigram<-data.frame(table(bigram))
+bigramsort<-bigram[order(bigram$Freq,decreasing=TRUE),]
+bigramsorttop<-bigramsort[1:50,]
+bigramsorttop$bigram<-factor(bigramsorttop$bigram, levels=bigramsorttop$bigram[order(-bigramsort$Freq)])
+
+ggplot(bigramsorttop,aes(x=bigram,y=Freq, fill=Freq))+
+  geom_bar(stat = "identity")+
+  theme_classic()+
+  coord_flip()+
+  labs(x= "NGrams",y="Frequency", title="Ngram-2 Frequency")
+```
+
+...and NGram-3
+
+```{r echo=TRUE}
+
+trigram<-data.frame(table(trigram))
+trigramsort<-trigram[order(trigram$Freq,decreasing=TRUE),]
+trigramsorttop<-trigramsort[1:50,]
+trigramsorttop$trigram<-factor(trigramsorttop$trigram, levels=trigramsorttop$trigram[order(-trigramsort$Freq)])
+
+ggplot(trigramsorttop,aes(x=trigram,y=Freq, fill=Freq))+
+  geom_bar(stat = "identity")+
+  theme_classic()+
+  coord_flip()+
+  labs(x= "NGrams",y="Frequency", title="Ngram-3 Frequency")
+
+```
+
+# Next Steps
+
+To build a predictive text mining application.
+
+Build a basic n-gram model using the exploratory analysis above.
+build a basic n-gram model for predicting the next word based on the previous 1, 2, or 3 words.
+Build a model to handle unseen n-grams as in some cases people will want to type a combination of words that does not appear in the corpora. Build a model to handle cases where a particular n-gram isn't observed.
+
+
+Build a predictive model based on the previous data modeling steps.
+Evaluate the model for efficiency and accuracy - use timing software to evaluate the computational complexity of your model. 
+Evaluate the model accuracy using different metrics like perplexity, accuracy at the first word, second word, and third word.
+
+Questions to consider:
+
+How does the model perform for different choices of the parameters and size of the model?
+How much does the model slow down for the performance you gain?
+Does perplexity correlate with the other measures of accuracy?
+Can you reduce the size of the model (number of parameters) without reducing performance?
+
+
